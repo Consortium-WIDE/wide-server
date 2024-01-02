@@ -3,6 +3,8 @@ const router = express.Router();
 const { SiweMessage } = require('siwe');
 const { kv } = require('@vercel/kv');
 
+const ALLOWED_TIME_WINDOW = process.env.SIWE_MESSAGE_EXPIRY_SECONDS * 1000
+
 /**
  * @swagger
  * /siwe/generate_message:
@@ -45,10 +47,11 @@ router.get('/generate_message', async (req, res) => {
         version: '1',
         nonce: nonce,
         issuedAt: new Date().toISOString(),
+        expirationTime: new Date(new Date().getTime() + ALLOWED_TIME_WINDOW).toISOString(),
         chainId: 0
     });
 
-    await kv.set(`nonce:${ethereumAddress}`, { nonce: nonce, timestamp: new Date() }, { expirationTtl: 300 }); // Expiration time in seconds (e.g., 300 seconds = 5 minutes)
+    await kv.set(`nonce:${ethereumAddress}`, { nonce: nonce, timestamp: new Date() }, { expirationTtl: process.env.SIWE_MESSAGE_EXPIRY_SECONDS });
     res.send({ message: message });
 });
 
@@ -96,11 +99,21 @@ router.post('/verify_message', async (req, res) => {
         const verifiedMsg = await siweMessage.verify({ signature });
         const recoveredAddress = verifiedMsg.data.address;
 
+        //Verify  Message Integrity
+        const messageIsValid = checkMessageIntegrity(siweMessage, {
+            domain: process.env.WEB_DOMAIN,
+            address: recoveredAddress,
+            statement: process.env.SIWE_MESSAGE,
+            uri: process.env.WEB_DOMAIN,
+            version: '1',
+            chainId: 0
+        });
+        
         // Retrieve the nonce from the KV store
         const nonceKey = `nonce:${recoveredAddress}`;
         const nonceInfo = await kv.get(nonceKey);
 
-        if (nonceInfo && nonceInfo.nonce === siweMessage.nonce && !isNonceExpired(nonceInfo.timestamp)) {
+        if (messageIsValid && nonceInfo && nonceInfo.nonce === siweMessage.nonce && !isNonceExpired(nonceInfo.timestamp)) {
             await kv.del(nonceKey);
             res.send({ success: true, message: 'Authentication successful.' });
         } else {
@@ -121,6 +134,17 @@ function generateNonce() {
 function isNonceExpired(timestamp) {
     const nonceLifetime = 5 * 60 * 1000; // 5 minutes in milliseconds
     return new Date() - timestamp > nonceLifetime;
+}
+
+function checkMessageIntegrity(siweMessage, expectedValues) {
+    // expectedValues should be an object containing the expected domain, statement, uri, etc.
+    return siweMessage.domain === expectedValues.domain &&
+           siweMessage.address === expectedValues.address &&
+           siweMessage.statement === expectedValues.statement &&
+           siweMessage.uri === expectedValues.uri &&
+           siweMessage.version === expectedValues.version &&
+           siweMessage.chainId === expectedValues.chainId
+           // Issued At and Expiry are informational only, since that is defined by the nonce expiry
 }
 
 module.exports = router;
