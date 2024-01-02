@@ -99,6 +99,8 @@ router.post('/verify_message', async (req, res) => {
         const verifiedMsg = await siweMessage.verify({ signature });
         const recoveredAddress = verifiedMsg.data.address;
 
+        //TODO: Verify Terms of Service have been signed
+        
         //Verify  Message Integrity
         const messageIsValid = checkMessageIntegrity(siweMessage, {
             domain: process.env.WEB_DOMAIN,
@@ -132,7 +134,7 @@ function generateNonce() {
 
 // Check if nonce is expired
 function isNonceExpired(timestamp) {
-    const nonceLifetime = 5 * 60 * 1000; // 5 minutes in milliseconds
+    const nonceLifetime = ALLOWED_TIME_WINDOW;
     return new Date() - timestamp > nonceLifetime;
 }
 
