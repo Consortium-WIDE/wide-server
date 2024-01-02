@@ -107,8 +107,6 @@ router.post('/verify_message', async (req, res) => {
             res.send({ success: false, message: 'Invalid or expired nonce.' });
         }
     } catch (error) {
-        debugger;
-
         console.error('Error verifying message:', error);
         res.status(400).send({ success: false, message: 'Verification failed.' });
     }
