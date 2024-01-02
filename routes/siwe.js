@@ -114,30 +114,6 @@ router.post('/verify_message', async (req, res) => {
     }
 });
 
-router.get('/test', async(req, res) => {
-    try {
-        const ethereumAddress = "0x4f3C6Fa6b415AA1EF9fF9db3a86B8DB5F4F186a2";
-
-        const nonce = generateNonce(); // Implement this function to generate a unique nonce
-        const message = new SiweMessage({
-            domain: process.env.WEB_DOMAIN,
-            address: ethereumAddress,
-            statement: 'Sign in with Ethereum to the app.',
-            uri: 'https://yourdomain.com',
-            version: '1',
-            nonce: nonce,
-            chainId: 1
-        });
-
-        res.send({ message: message});
-
-    } catch (error) {
-        console.error('Error testing message:', error);
-        res.status(400).send({ success: false, message: 'Verification failed.' });
-    }
-})
-
-
 // Generate a unique nonce
 function generateNonce() {
     return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
