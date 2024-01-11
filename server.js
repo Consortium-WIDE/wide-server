@@ -18,11 +18,13 @@ const options = {
   };
   
 const swaggerSpec = swaggerJsdoc(options);
-const storageRoutes = require('./routes/storage');
+const storage = require('./routes/storage');
+const storageLegacyRoutes = require('./routes/storageLegacy');
 const siweRoutes = require('./routes/siwe');
 
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
-app.use('/storage', storageRoutes);
+app.use('/storage', storage);
+app.use('/storage-legacy', storageLegacyRoutes);
 app.use('/siwe', siweRoutes);
 
 const port = process.env.PORT || 3000;
