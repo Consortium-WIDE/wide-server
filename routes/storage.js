@@ -8,36 +8,6 @@ function hashData(data) {
     return crypto.createHash('sha256').update(stringifiedData).digest('hex');
 }
 
-/**
- * @swagger
- * /storage/user/{accountAddress}/issued-credentials:
- *   get:
- *     summary: Retrieve the type of credentials the user has been issued
- *     description: Retrieve the type of credentials the user has been issued.
- *     parameters:
- *       - in: path
- *         name: accountAddress
- *         required: true
- *         schema:
- *           type: string
- *         description: The account address of the user.
- *     responses:
- *       '200':
- *         description: Successfully retrieved data.
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               # Define the properties of your data object here
- *       '204':
- *         description: Data exists but is empty.
- *       '404':
- *         description: Data not found for the specified account address.
- *       '500':
- *         description: Internal server error.
- *     tags:
- *       - User
- */
 router.get('/user/:accountAddress/issued-credentials', async (req, res) => {
     try {
         const { accountAddress } = req.params;
@@ -62,45 +32,12 @@ router.get('/user/:accountAddress/issued-credentials', async (req, res) => {
     }
 });
 
-/**
- * @swagger
- * /user/{accountAddress}/credential:
- *   get:
- *     summary: Retrieve a specific user credential
- *     description: Fetches a specific credential for a user based on their account address and issuer hash. Returns the credential data if found, else returns a 204 status code indicating no content.
- *     parameters:
- *       - in: path
- *         name: accountAddress
- *         required: true
- *         schema:
- *           type: string
- *         description: The account address of the user.
- *       - in: header
- *         name: issuerHash
- *         required: true
- *         schema:
- *           type: string
- *         description: The hash of the issuer associated with the credential.
- *     responses:
- *       '200':
- *         description: Successfully retrieved the credential data.
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               # Define the schema of your credential data here
- *       '204':
- *         description: No content, credential data not found.
- *       '500':
- *         description: Internal server error.
- *     tags:
- *       - User Credential
- */
-router.get('/user/:accountAddress/credential', async (req, res) => {
+router.get('/user/:accountAddress/credentials/:key', async (req, res) => {
     try {
-        const credentialKey = `account:${accountAddress}:credential:${issuerHash}`;
+        const { accountAddress, key } = req.params;
+        const credentialKey = `account:${accountAddress}:credential:${key}`;
 
-        const credentialData = await kv.hget(credentialKey, 'credential');
+        const credentialData = await kv.hgetall(credentialKey);
 
         if (credentialData) {
             res.status(200).json(credentialData);
@@ -113,54 +50,6 @@ router.get('/user/:accountAddress/credential', async (req, res) => {
     }
 });
 
-/**
- * @swagger
- * /user/{accountAddress}/credential:
- *   post:
- *     summary: Set user credential
- *     description: Stores credential data for a given user account address. The endpoint expects issuer details, payload, and credentials array in the request body.
- *     parameters:
- *       - in: path
- *         name: accountAddress
- *         required: true
- *         schema:
- *           type: string
- *         description: The account address of the user.
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               issuer:
- *                 type: object
- *                 description: Details about the issuer.
- *                 properties:
- *                   issuer:
- *                     type: string
- *                     description: Issuer identifier.
- *               payload:
- *                 type: object
- *                 description: Payload containing the credential data.
- *               credentials:
- *                 type: array
- *                 description: Array of credentials.
- *                 items:
- *                   type: object
- *                   properties:
- *                     name:
- *                       type: string
- *                     val:
- *                       type: string
- *     responses:
- *       '200':
- *         description: Data set successfully.
- *       '500':
- *         description: Internal server error.
- *     tags:
- *       - User Credential
- */
 router.post('/user/:accountAddress/credential', async (req, res) => {
     try {
         const { accountAddress } = req.params;
@@ -171,12 +60,13 @@ router.post('/user/:accountAddress/credential', async (req, res) => {
         const issuersIndexKey = `account:${accountAddress}:issued-credentials`;
         const credentialKey = `account:${accountAddress}:credential:${issuerHash}`
 
-        await kv.rpush(issuersIndexKey, issuer);
-        await kv.hset(credentialKey, 'credential', JSON.stringify(payload));
+        //add hash (unique identifier) to the issuer.
+        //this will allow us to conveniently be able to retrieve the associated data at a later stage.
+        const issuerInternalIdProp = { wideInternalId: issuerHash }
+        let issuerWithId = { ...issuerInternalIdProp, ...issuer }
 
-        await credentials.forEach(async (credential) => {
-            await kv.hset(credentialKey, credential.name, JSON.stringify(credential.val));
-        });
+        await kv.rpush(issuersIndexKey, issuerWithId);
+        await kv.hset(credentialKey, { payload: payload, credentials: credentials });
 
         res.status(200).json(`Data for ${credentialKey} set successfully`);
     } catch (error) {
