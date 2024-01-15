@@ -40,10 +40,20 @@ const ALLOWED_TIME_WINDOW = process.env.SIWE_MESSAGE_EXPIRY_SECONDS * 1000
  */
 router.get('/generate_signin', async (req, res) => {
     const ethereumAddress = req.query.ethereumAddress;
+
+    //Check if TOS have been signed
+    const tosSigned = await kv.get(`termsofservice:${ethereumAddress}`);
+
+    if (!tosSigned || tosSigned > new Date()) {
+        res.send({ success: false, requiresSignup: true, message: 'Terms of Service have not yet been signed.' });
+        return;
+    }
+    
+
     const message = generateSiweMessage(ethereumAddress, process.env.SIWE_SIGNIN_MESSAGE);
 
     await kv.set(`nonce:${ethereumAddress}`, { nonce: message.nonce, timestamp: new Date() }, { expirationTtl: process.env.SIWE_MESSAGE_EXPIRY_SECONDS });
-    res.send({ message: message });
+    res.send({  success: true, requiresSignup: false, message: message });
 });
 
 /**
