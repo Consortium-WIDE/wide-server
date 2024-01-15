@@ -180,22 +180,7 @@ router.post('/verify_signin', async (req, res) => {
             if (messageIsValid && nonceInfo && nonceInfo.nonce === siweMessage.nonce && !isNonceExpired(nonceInfo.timestamp)) {
                 await kv.del(nonceKey);
 
-                const session = {
-                    user: recoveredAddress
-                };
-
-                const cookieConfig = {
-                    httpOnly: true, //This needs to be HTTP only. No option. This is to prevent the cookie from being read by client-side scripts
-                    secure: process.env.COOKIE_USE_SECURE.toLocaleLowerCase() === 'true' ?? true,
-                    sameSite: process.env.COOKIE_SAME_SITE ?? 'strict',
-                    maxAge: process.env.COOKIE_EXPIRY_MILLISECONDS ?? 3600000
-                }
-
-                if (process.env.COOKIE_DOMAIN !== 'LOCAL') {
-                    cookieConfig.domain = process.env.COOKIE_DOMAIN
-                }
-
-                res.cookie('session_id', JSON.stringify(session), cookieConfig);
+                req.session.user = recoveredAddress;
 
                 res.send({ success: true, message: 'Authentication successful.' });
             } else {
