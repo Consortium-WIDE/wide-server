@@ -2,13 +2,14 @@ const crypto = require('crypto');
 const express = require('express');
 const router = express.Router();
 const { kv } = require('@vercel/kv');
+const isAuthenticated = require('../middleware/authenticate');
 
 function hashData(data) {
     const stringifiedData = JSON.stringify(data);
     return crypto.createHash('sha256').update(stringifiedData).digest('hex');
 }
 
-router.get('/user/:accountAddress/issued-credentials', async (req, res) => {
+router.get('/user/:accountAddress/issued-credentials', isAuthenticated, async (req, res) => {
     try {
         const { accountAddress } = req.params;
         const key = `account:${accountAddress}:issued-credentials`;
@@ -32,7 +33,7 @@ router.get('/user/:accountAddress/issued-credentials', async (req, res) => {
     }
 });
 
-router.get('/user/:accountAddress/credentials/:key', async (req, res) => {
+router.get('/user/:accountAddress/credentials/:key', isAuthenticated, async (req, res) => {
     try {
         const { accountAddress, key } = req.params;
         const credentialKey = `account:${accountAddress}:credential:${key}`;
@@ -50,7 +51,7 @@ router.get('/user/:accountAddress/credentials/:key', async (req, res) => {
     }
 });
 
-router.post('/user/:accountAddress/credential', async (req, res) => {
+router.post('/user/:accountAddress/credential', isAuthenticated, async (req, res) => {
     try {
         const { accountAddress } = req.params;
         const { issuer, payload, credentials } = req.body;

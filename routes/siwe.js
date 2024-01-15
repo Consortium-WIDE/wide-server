@@ -1,4 +1,5 @@
 const express = require('express');
+const cookieParser = require('cookie-parser');
 const router = express.Router();
 const { SiweMessage } = require('siwe');
 const { kv } = require('@vercel/kv');
@@ -48,12 +49,12 @@ router.get('/generate_signin', async (req, res) => {
         res.send({ success: false, requiresSignup: true, message: 'Terms of Service have not yet been signed.' });
         return;
     }
-    
+
 
     const message = generateSiweMessage(ethereumAddress, process.env.SIWE_SIGNIN_MESSAGE);
 
     await kv.set(`nonce:${ethereumAddress}`, { nonce: message.nonce, timestamp: new Date() }, { expirationTtl: process.env.SIWE_MESSAGE_EXPIRY_SECONDS });
-    res.send({  success: true, requiresSignup: false, message: message });
+    res.send({ success: true, requiresSignup: false, message: message });
 });
 
 /**
@@ -150,7 +151,7 @@ router.post('/verify_signin', async (req, res) => {
             res.send({ success: false, requiresSignup: true, message: 'Terms of Service have not yet been signed.' });
         } else {
             let messageIsValid = false;
-            
+
             //Verify Message Integrity
             if (isOnboarding) {
                 messageIsValid = checkMessageIntegrity(siweMessage, {
@@ -179,7 +180,22 @@ router.post('/verify_signin', async (req, res) => {
             if (messageIsValid && nonceInfo && nonceInfo.nonce === siweMessage.nonce && !isNonceExpired(nonceInfo.timestamp)) {
                 await kv.del(nonceKey);
 
-                //TODO: Set Https Cookie;
+                const session = {
+                    user: recoveredAddress
+                };
+
+                const cookieConfig = {
+                    httpOnly: true, //This needs to be HTTP only. No option. This is to prevent the cookie from being read by client-side scripts
+                    secure: process.env.COOKIE_USE_SECURE.toLocaleLowerCase() === 'true' ?? true,
+                    sameSite: process.env.COOKIE_SAME_SITE ?? 'strict',
+                    maxAge: process.env.COOKIE_EXPIRY_MILLISECONDS ?? 3600000
+                }
+
+                if (process.env.COOKIE_DOMAIN !== 'LOCAL') {
+                    cookieConfig.domain = process.env.COOKIE_DOMAIN
+                }
+
+                res.cookie('session_id', JSON.stringify(session), cookieConfig);
 
                 res.send({ success: true, message: 'Authentication successful.' });
             } else {
@@ -226,7 +242,7 @@ router.delete('/tos', async (req, res) => {
     const ethereumAddress = req.query.ethereumAddress;
     await kv.del(`termsofservice:${ethereumAddress}`);
 
-    res.send({success: true, message: `Delete TOS timestamp for ${ethereumAddress}`});
+    res.send({ success: true, message: `Delete TOS timestamp for ${ethereumAddress}` });
 });
 
 //Generate SIWE message for WIDE

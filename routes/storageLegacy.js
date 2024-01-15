@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { kv } = require('@vercel/kv');
+const isAuthenticated = require('../middleware/authenticate');
 
 // Helper function to build a user-specific key
 const allowedTypes = new Set(['publicKey', 'vc', 'claim', 'secondaryAddresses', 'primaryAddress', 'vcIds']);
@@ -68,7 +69,7 @@ const buildKey = (accountAddress, type, id, secondaryType, secondaryId) => {
  *       500:
  *         description: Error retrieving data
  */
-router.get('/user/:accountAddress/:type?/:id?/:secondaryType?/:secondaryId?', async (req, res) => {
+router.get('/user/:accountAddress/:type?/:id?/:secondaryType?/:secondaryId?', isAuthenticated, async (req, res) => {
     try {
         const { accountAddress, type, id, secondaryType, secondaryId } = req.params;
         const key = buildKey(accountAddress, type, id, secondaryType, secondaryId);
@@ -136,7 +137,7 @@ router.get('/user/:accountAddress/:type?/:id?/:secondaryType?/:secondaryId?', as
  *       500:
  *         description: Error setting data
  */
-router.post('/user/:accountAddress/:type?/:id?/:secondaryType?/:secondaryId?', async (req, res) => {
+router.post('/user/:accountAddress/:type?/:id?/:secondaryType?/:secondaryId?', isAuthenticated, async (req, res) => {
     try {
         //TODO: Check to make sure buildkey params are known and thus valid.
 
@@ -206,7 +207,7 @@ router.post('/user/:accountAddress/:type?/:id?/:secondaryType?/:secondaryId?', a
  *       500:
  *         description: Error updating data
  */
-router.put('/user/:accountAddress/:type?/:id?/:secondaryType?/:secondaryId?', async (req, res) => {
+router.put('/user/:accountAddress/:type?/:id?/:secondaryType?/:secondaryId?', isAuthenticated, async (req, res) => {
     try {
         const { accountAddress, type, id, secondaryType, secondaryId } = req.params;
         const key = buildKey(accountAddress, type, id, secondaryType, secondaryId);
@@ -268,7 +269,7 @@ router.put('/user/:accountAddress/:type?/:id?/:secondaryType?/:secondaryId?', as
  *       500:
  *         description: Error deleting data.
  */
-router.delete('/user/:accountAddress/:type?/:id?/:secondaryType?/:secondaryId?', async (req, res) => {
+router.delete('/user/:accountAddress/:type?/:id?/:secondaryType?/:secondaryId?', isAuthenticated, async (req, res) => {
     try {
         const { accountAddress, type, id, secondaryType, secondaryId } = req.params;
         const key = buildKey(accountAddress, type, id, secondaryType, secondaryId);
