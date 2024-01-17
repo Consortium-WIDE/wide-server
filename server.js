@@ -3,6 +3,7 @@ const cors = require('cors');
 const express = require('express');
 const cookieParser = require('cookie-parser');
 const session = require('express-session');
+const VercelKVStore = require('./sessionstores/vercelKvStore');
 
 const app = express();
 app.use(express.json());
@@ -18,6 +19,7 @@ app.use(cors(
 
 app.use(session({
   secret: process.env.SESSION_SECRET, // Secret used to sign the session ID cookie
+  store: new VercelKVStore(),
   resave: false,
   saveUninitialized: false,
   cookie: {
@@ -26,7 +28,6 @@ app.use(session({
     sameSite: process.env.COOKIE_SAME_SITE || 'lax',
     maxAge: parseInt(process.env.COOKIE_EXPIRY_MILLISECONDS, 10) || 3600000
   }
-  // If using a store for production (recommended), configure it here
 }));
 
 console.log('starting server for CORS origin: ', process.env.WEB_DOMAIN);
@@ -44,12 +45,10 @@ const options = {
 
 const swaggerSpec = swaggerJsdoc(options);
 const storage = require('./routes/storage');
-const storageLegacyRoutes = require('./routes/storageLegacy');
 const siweRoutes = require('./routes/siwe');
 
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.use('/storage', storage);
-app.use('/storage-legacy', storageLegacyRoutes);
 app.use('/siwe', siweRoutes);
 
 const port = process.env.PORT || 3000;
