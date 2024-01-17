@@ -1,4 +1,5 @@
 const express = require('express');
+const cookieParser = require('cookie-parser');
 const router = express.Router();
 const { SiweMessage } = require('siwe');
 const { kv } = require('@vercel/kv');
@@ -41,19 +42,24 @@ const ALLOWED_TIME_WINDOW = process.env.SIWE_MESSAGE_EXPIRY_SECONDS * 1000
 router.get('/generate_signin', async (req, res) => {
     const ethereumAddress = req.query.ethereumAddress;
 
+    if (req.session && req.session.user && req.session.user === ethereumAddress) {
+        // User already logged in, no need to sign in again
+        res.send({ success: true, requiresSignup: false, alreadyLoggedIn: true });
+        return;
+    }
+
     //Check if TOS have been signed
     const tosSigned = await kv.get(`termsofservice:${ethereumAddress}`);
 
     if (!tosSigned || tosSigned > new Date()) {
-        res.send({ success: false, requiresSignup: true, message: 'Terms of Service have not yet been signed.' });
+        res.send({ success: false, requiresSignup: true, alreadyLoggedIn: false, message: 'Terms of Service have not yet been signed.' });
         return;
     }
-    
 
     const message = generateSiweMessage(ethereumAddress, process.env.SIWE_SIGNIN_MESSAGE);
 
     await kv.set(`nonce:${ethereumAddress}`, { nonce: message.nonce, timestamp: new Date() }, { expirationTtl: process.env.SIWE_MESSAGE_EXPIRY_SECONDS });
-    res.send({  success: true, requiresSignup: false, message: message });
+    res.send({ success: true, requiresSignup: false, alreadyLoggedIn: false, message: message });
 });
 
 /**
@@ -150,7 +156,7 @@ router.post('/verify_signin', async (req, res) => {
             res.send({ success: false, requiresSignup: true, message: 'Terms of Service have not yet been signed.' });
         } else {
             let messageIsValid = false;
-            
+
             //Verify Message Integrity
             if (isOnboarding) {
                 messageIsValid = checkMessageIntegrity(siweMessage, {
@@ -179,7 +185,7 @@ router.post('/verify_signin', async (req, res) => {
             if (messageIsValid && nonceInfo && nonceInfo.nonce === siweMessage.nonce && !isNonceExpired(nonceInfo.timestamp)) {
                 await kv.del(nonceKey);
 
-                //TODO: Set Https Cookie;
+                req.session.user = recoveredAddress;
 
                 res.send({ success: true, message: 'Authentication successful.' });
             } else {
@@ -226,7 +232,11 @@ router.delete('/tos', async (req, res) => {
     const ethereumAddress = req.query.ethereumAddress;
     await kv.del(`termsofservice:${ethereumAddress}`);
 
-    res.send({success: true, message: `Delete TOS timestamp for ${ethereumAddress}`});
+    res.send({ success: true, message: `Delete TOS timestamp for ${ethereumAddress}` });
+});
+
+router.get('/publicKey', (req, res) => {
+    res.send({ success: true, message: process.env.WEB3_PUBLIC_KEY });
 });
 
 //Generate SIWE message for WIDE

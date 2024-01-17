@@ -10,12 +10,16 @@
   "license": "ISC",
   "dependencies": {
     "@vercel/kv": "^1.0.0",
+    "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
+    "express-session": "^1.17.3",
+    "json-canonicalize": "^1.0.6",
     "siwe": "^2.1.4",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.0",
+    "web3": "^4.3.0",
     "yamljs": "^0.3.0"
   }
 }
