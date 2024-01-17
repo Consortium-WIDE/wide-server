@@ -10,8 +10,14 @@ const contract = new web3.eth.Contract(contractABI, contractAddress);
 async function logPayload(payloadKey, payloadSignature) {
     const senderAccount = process.env.WEB3_PUBLIC_KEY;
     const privateKey = process.env.WEB3_PRIVATE_KEY;
-    
-    const logPayloadData = contract.methods.logPayload(payloadKey, payloadSignature).encodeABI();
+
+    // Create PayloadSignaturePair object
+    const payloadPair = {
+        payloadKey: payloadKey,
+        signature: payloadSignature
+    };
+
+    const logPayloadData = contract.methods.logPayload(payloadPair).encodeABI();
 
     const gasEstimate = await web3.eth.estimateGas({
         from: senderAccount,
