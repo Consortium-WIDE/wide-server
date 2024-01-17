@@ -17,17 +17,23 @@ app.use(cors(
     credentials: true,
   }));
 
+let cookieConfig = {
+  httpOnly: true,
+  secure: process.env.COOKIE_USE_SECURE === 'true',
+  sameSite: process.env.COOKIE_SAME_SITE || 'lax',
+  maxAge: parseInt(process.env.COOKIE_EXPIRY_MILLISECONDS, 10) || 3600000
+}
+
+if (process.env.COOKIE_DOMAIN != 'LOCAL') {
+  cookieConfig.domain = process.env.COOKIE_DOMAIN;
+}
+
 app.use(session({
   secret: process.env.SESSION_SECRET, // Secret used to sign the session ID cookie
   store: new VercelKVStore(),
   resave: false,
   saveUninitialized: false,
-  cookie: {
-    httpOnly: true,
-    secure: process.env.COOKIE_USE_SECURE === 'true',
-    sameSite: process.env.COOKIE_SAME_SITE || 'lax',
-    maxAge: parseInt(process.env.COOKIE_EXPIRY_MILLISECONDS, 10) || 3600000
-  }
+  cookie: cookieConfig
 }));
 
 console.log('starting server for CORS origin: ', process.env.WEB_DOMAIN);
