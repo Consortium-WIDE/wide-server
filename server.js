@@ -28,6 +28,8 @@ if (process.env.COOKIE_DOMAIN != 'LOCAL') {
   cookieConfig.domain = process.env.COOKIE_DOMAIN;
 }
 
+console.log('cookieConfig', cookieConfig);
+
 app.use(session({
   secret: process.env.SESSION_SECRET, // Secret used to sign the session ID cookie
   store: new VercelKVStore(),
