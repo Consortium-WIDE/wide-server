@@ -6,6 +6,7 @@ const session = require('express-session');
 const VercelKVStore = require('./sessionstores/vercelKvStore');
 
 const app = express();
+app.set('trust proxy', 1); // Trust the first proxy
 app.use(express.json());
 app.use(cookieParser());
 
