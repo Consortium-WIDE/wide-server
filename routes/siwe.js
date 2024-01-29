@@ -2,7 +2,7 @@ const express = require('express');
 const cookieParser = require('cookie-parser');
 const router = express.Router();
 const { SiweMessage } = require('siwe');
-const { kv } = require('@vercel/kv');
+const { redisClient } = require('../redisClient');
 
 const ALLOWED_TIME_WINDOW = process.env.SIWE_MESSAGE_EXPIRY_SECONDS * 1000
 
@@ -49,16 +49,20 @@ router.get('/generate_signin', async (req, res) => {
     }
 
     //Check if TOS have been signed
-    const tosSigned = await kv.get(`termsofservice:${ethereumAddress}`);
+    const tosSigned = await redisClient.get(`termsofservice:${ethereumAddress}`);
+    const tosSignedDate = tosSigned ? new Date(JSON.parse(tosSigned)) : null;
 
-    if (!tosSigned || tosSigned > new Date()) {
+    if (!tosSigned || tosSignedDate > new Date()) {
         res.send({ success: false, requiresSignup: true, alreadyLoggedIn: false, message: 'Terms of Service have not yet been signed.' });
         return;
     }
 
     const message = generateSiweMessage(ethereumAddress, process.env.SIWE_SIGNIN_MESSAGE);
 
-    await kv.set(`nonce:${ethereumAddress}`, { nonce: message.nonce, timestamp: new Date() }, { expirationTtl: process.env.SIWE_MESSAGE_EXPIRY_SECONDS });
+    const nonceValue = JSON.stringify({ nonce: message.nonce, timestamp: new Date() });
+
+    // Set values in Redis with expiration (EX for seconds)
+    await redisClient.set(`nonce:${ethereumAddress}`, nonceValue, 'EX', process.env.SIWE_MESSAGE_EXPIRY_SECONDS);
     res.send({ success: true, requiresSignup: false, alreadyLoggedIn: false, message: message });
 });
 
@@ -99,8 +103,12 @@ router.get('/generate_signup', async (req, res) => {
     const ethereumAddress = req.query.ethereumAddress;
     const message = generateSiweMessage(ethereumAddress, process.env.SIWE_SIGNUP_MESSAGE);
 
-    await kv.set(`nonce:${ethereumAddress}`, { nonce: message.nonce, timestamp: new Date() }, { expirationTtl: process.env.SIWE_MESSAGE_EXPIRY_SECONDS });
-    await kv.set(`termsofservice:${ethereumAddress}`, new Date(), { expirationTtl: process.env.SIWE_MESSAGE_EXPIRY_SECONDS });
+    const nonceValue = JSON.stringify({ nonce: message.nonce, timestamp: new Date() });
+    const termsOfServiceValue = JSON.stringify(new Date());
+
+    await redisClient.set(`nonce:${ethereumAddress}`, nonceValue, 'EX', process.env.SIWE_MESSAGE_EXPIRY_SECONDS);
+    await redisClient.set(`termsofservice:${ethereumAddress}`, termsOfServiceValue);
+
     res.send({ message: message });
 });
 
@@ -150,47 +158,48 @@ router.post('/verify_signin', async (req, res) => {
 
         //TODO: Verify Terms of Service have been signed
         const tosSignedKey = `termsofservice:${recoveredAddress}`;
-        const tosSigned = await kv.get(tosSignedKey);
+        const tosSigned = await redisClient.get(tosSignedKey);
+        const tosSignedDate = tosSigned ? new Date(JSON.parse(tosSigned)) : null;
 
-        if (!tosSigned || tosSigned > new Date()) {
+        if (!tosSigned || tosSignedDate > new Date()) {
             res.send({ success: false, requiresSignup: true, message: 'Terms of Service have not yet been signed.' });
+            return; // Added return to prevent further execution
+        }
+
+        let messageIsValid = false;
+
+        //Verify Message Integrity
+        if (isOnboarding) {
+            messageIsValid = checkMessageIntegrity(siweMessage, {
+                domain: process.env.WEB_DOMAIN,
+                address: recoveredAddress,
+                statement: process.env.SIWE_SIGNUP_MESSAGE,
+                uri: process.env.WEB_DOMAIN,
+                version: '1',
+                chainId: 0
+            });
         } else {
-            let messageIsValid = false;
+            messageIsValid = checkMessageIntegrity(siweMessage, {
+                domain: process.env.WEB_DOMAIN,
+                address: recoveredAddress,
+                statement: process.env.SIWE_SIGNIN_MESSAGE,
+                uri: process.env.WEB_DOMAIN,
+                version: '1',
+                chainId: 0
+            });
+        }
 
-            //Verify Message Integrity
-            if (isOnboarding) {
-                messageIsValid = checkMessageIntegrity(siweMessage, {
-                    domain: process.env.WEB_DOMAIN,
-                    address: recoveredAddress,
-                    statement: process.env.SIWE_SIGNUP_MESSAGE,
-                    uri: process.env.WEB_DOMAIN,
-                    version: '1',
-                    chainId: 0
-                });
-            } else {
-                messageIsValid = checkMessageIntegrity(siweMessage, {
-                    domain: process.env.WEB_DOMAIN,
-                    address: recoveredAddress,
-                    statement: process.env.SIWE_SIGNIN_MESSAGE,
-                    uri: process.env.WEB_DOMAIN,
-                    version: '1',
-                    chainId: 0
-                });
-            }
+        // Retrieve the nonce info from Redis and deserialize
+        const nonceKey = `nonce:${recoveredAddress}`;
+        const nonceInfoStr = await redisClient.get(nonceKey);
+        const nonceInfo = nonceInfoStr ? JSON.parse(nonceInfoStr) : null;
 
-            // Retrieve the nonce from the KV store
-            const nonceKey = `nonce:${recoveredAddress}`;
-            const nonceInfo = await kv.get(nonceKey);
-
-            if (messageIsValid && nonceInfo && nonceInfo.nonce === siweMessage.nonce && !isNonceExpired(nonceInfo.timestamp)) {
-                await kv.del(nonceKey);
-
-                req.session.user = recoveredAddress;
-
-                res.send({ success: true, message: 'Authentication successful.' });
-            } else {
-                res.send({ success: false, message: 'Invalid or expired nonce.' });
-            }
+        if (messageIsValid && nonceInfo && nonceInfo.nonce === siweMessage.nonce && !isNonceExpired(nonceInfo.timestamp)) {
+            await redisClient.del(nonceKey);
+            req.session.user = recoveredAddress;
+            res.send({ success: true, message: 'Authentication successful.' });
+        } else {
+            res.send({ success: false, message: 'Invalid or expired nonce.' });
         }
     } catch (error) {
         console.error('Error verifying message:', error);
@@ -230,7 +239,7 @@ router.post('/verify_signin', async (req, res) => {
  */
 router.delete('/tos', async (req, res) => {
     const ethereumAddress = req.query.ethereumAddress;
-    await kv.del(`termsofservice:${ethereumAddress}`);
+    await redisClient.del(`termsofservice:${ethereumAddress}`);
 
     res.send({ success: true, message: `Delete TOS timestamp for ${ethereumAddress}` });
 });

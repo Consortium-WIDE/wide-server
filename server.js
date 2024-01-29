@@ -3,7 +3,8 @@ const cors = require('cors');
 const express = require('express');
 const cookieParser = require('cookie-parser');
 const session = require('express-session');
-const VercelKVStore = require('./sessionstores/vercelKvStore');
+const RedisStore = require('connect-redis').default;
+const { redisClient } = require('./redisClient'); // Your Redis client
 
 const app = express();
 app.set('trust proxy', 1); // Trust the first proxy
@@ -46,7 +47,7 @@ console.log('cookieConfig', cookieConfig);
 
 app.use(session({
   secret: process.env.SESSION_SECRET, // Secret used to sign the session ID cookie
-  store: new VercelKVStore(),
+  store: new RedisStore({ client: redisClient }),
   resave: false,
   saveUninitialized: false,
   cookie: cookieConfig

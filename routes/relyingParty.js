@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { kv } = require('@vercel/kv');
+const { redisClient } = require('../redisClient');
 const cors = require('cors');
 
 router.get('/config/:domain', async (req, res) => {
@@ -10,18 +10,13 @@ router.get('/config/:domain', async (req, res) => {
         const { domain } = req.params;
         const key = `rp:${domain}:config`;
 
-        const keyExists = await kv.exists(key);
+        const data = await redisClient.get(key);
 
-        if (!keyExists) {
-            res.status(204).json([]);
-            return;
-        }
-
-        const data = await kv.get(key);
         if (data) {
-            res.status(200).json(data);
+            // Deserialize the JSON string back into an object
+            res.status(200).json(JSON.parse(data));
         } else {
-            res.status(204).json(data);
+            res.status(204).json({});
         }
 
     } catch (error) {
@@ -36,7 +31,7 @@ router.post('/config/:domain', async (req, res) => {
         const key = `rp:${domain}:config`;
         const data = req.body;
 
-        await kv.set(key, data);
+        await redisClient.set(key, JSON.stringify(data));
 
         res.status(200).json(`Config for ${domain} registered successfully`);
     } catch (error) {
@@ -50,12 +45,12 @@ router.delete('/config/:domain', async (req, res) => {
         const { domain } = req.params;
         const key = `rp:${domain}:config`;
 
-        await kv.del(key);
+        await redisClient.del(key);
 
         res.status(200).json(`Config for ${domain} deleted successfully`);
     } catch (error) {
-        console.error('Error setting data:', error);
-        res.status(500).json('Error setting data');
+        console.error('Error deleting data:', error);
+        res.status(500).json('Error deleting data');
     }
 });
 
