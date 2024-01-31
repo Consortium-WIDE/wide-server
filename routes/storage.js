@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 const express = require('express');
 const router = express.Router();
-const { kv } = require('@vercel/kv');
+const { redisClient } = require('../redisClient');
 const isAuthenticated = require('../middleware/authenticate');
 const { logPayload, hashDataKeccak256, hashTextKeccak256, recoverDataFromWide, signDataAsWide } = require('../web3/web3Connector');
 const web3 = require('web3');
@@ -11,18 +11,20 @@ router.get('/user/:accountAddress/issued-credentials', isAuthenticated, async (r
         const { accountAddress } = req.params;
         const key = `account:${accountAddress}:issued-credentials`;
 
-        const keyExists = await kv.exists(key);
+        const keyExists = await redisClient.exists(key);
 
         if (!keyExists) {
             res.status(204).json([]);
             return;
         }
 
-        const data = await kv.lrange(key, 0, -1);
-        if (data) {
-            res.status(200).json(data);
+        const data = await redisClient.lrange(key, 0, -1);
+        if (data && data.length > 0) {
+            // Assuming the data in the list is stored as JSON strings
+            const credentials = data.map(item => JSON.parse(item));
+            res.status(200).json(credentials);
         } else {
-            res.status(204).json(data);
+            res.status(204).json([]);
         }
     } catch (error) {
         console.error('Error retrieving data:', error);
@@ -35,12 +37,15 @@ router.get('/user/:accountAddress/credentials/:key', isAuthenticated, async (req
         const { accountAddress, key } = req.params;
         const credentialKey = `account:${accountAddress}:credential:${key}`;
 
-        const credentialData = await kv.hgetall(credentialKey);
+        const credentialData = await redisClient.hgetall(credentialKey);
 
-        if (credentialData) {
+        if (credentialData && Object.keys(credentialData).length !== 0) {
+            for (const prop in credentialData) {
+                credentialData[prop] = JSON.parse(credentialData[prop]);
+            }
             res.status(200).json(credentialData);
         } else {
-            res.status(204).json(credentialData);
+            res.status(204).json({});
         }
     } catch (error) {
         console.error('Error retrieving data:', error);
@@ -49,7 +54,7 @@ router.get('/user/:accountAddress/credentials/:key', isAuthenticated, async (req
 });
 
 router.post('/user/:accountAddress/credential', isAuthenticated, async (req, res) => {
-    //TODO: Consider separating into two separate try catch blocks to separate kv storage from web3 errors.
+    //TODO: Consider separating into two separate try catch blocks to separate redisClient storage from web3 errors.
     try {
         const { accountAddress } = req.params;
         const { issuer, payload, credentials } = req.body;
@@ -66,15 +71,12 @@ router.post('/user/:accountAddress/credential', isAuthenticated, async (req, res
         const encPayloadHash = hashTextKeccak256(payload.ciphertext); 
 
         const issuersIndexKey = `account:${accountAddress}:issued-credentials`;
-        const credentialKey = `account:${accountAddress}:credential:${issuerHash}`
+        const credentialKey = `account:${accountAddress}:credential:${issuerHash}`;
 
-        //add hash (unique identifier) to the issuer.
-        //this will allow us to conveniently be able to retrieve the associated data at a later stage.
-        const issuerInternalIdProp = { wideInternalId: issuerHash }
-        let issuerWithId = { ...issuerInternalIdProp, ...issuer }
+        const issuerWithId = JSON.stringify({ wideInternalId: issuerHash, ...issuer });
 
-        await kv.rpush(issuersIndexKey, issuerWithId);
-        await kv.hset(credentialKey, { payload: payload, credentials: credentials });
+        await redisClient.rpush(issuersIndexKey, issuerWithId);
+        await redisClient.hset(credentialKey, 'payload', JSON.stringify(payload), 'credentials', JSON.stringify(credentials));
 
         //We must canonicalize this payload since its hash is used for RP verification
         const payloadSignatureMessage = {
