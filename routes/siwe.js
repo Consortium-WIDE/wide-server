@@ -248,6 +248,16 @@ router.get('/publicKey', (req, res) => {
     res.send({ success: true, message: process.env.WEB3_PUBLIC_KEY });
 });
 
+
+router.delete('/signout', async (req, res) => {
+    const ethereumAddress = req.query.ethereumAddress;
+    
+    res.clearCookie('connect.sid', { path: '/' });
+    await redisClient.del(`nonce:${ethereumAddress}`);
+
+    res.send({ message: 'Signed out of WIDE' });
+});
+
 //Generate SIWE message for WIDE
 function generateSiweMessage(ethereumAddress, statement) {
     const nonce = generateNonce();
