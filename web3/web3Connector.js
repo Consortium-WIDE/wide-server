@@ -38,6 +38,27 @@ async function logPayload(payloadKey, payloadSignature) {
     const txReceipt = await web3.eth.sendSignedTransaction(signedTransaction.rawTransaction);
 }
 
+async function logPresentation(historyKey, data) {
+    const senderAccount = process.env.WEB3_PUBLIC_KEY;
+    
+    const stringifiedData = JSON.stringify(data);
+
+    const logPresentationTx = contract.methods.logPresentation(historyKey, stringifiedData);
+
+    await logPresentationTx.send({ from: senderAccount })
+        .on('receipt', (receipt) => {
+            console.log('Transaction receipt:', receipt);
+        })
+        .on('error', (error) => {
+            console.error('Error:', error);
+        });
+}
+
+async function getPresentationHistory(historyKey) {
+    const rawData = await contract.methods.getPresentationHistory(historyKey).call();
+    return rawData;
+}
+
 function hashDataKeccak256(data) {
     return web3.utils.keccak256(JSON.stringify(canonicalize(data)));
 }
@@ -71,6 +92,8 @@ function recoverTextFromWide(message, signature) {
 
 module.exports = {
     logPayload,
+    logPresentation,
+    getPresentationHistory,
     hashDataKeccak256,
     hashTextKeccak256,
     signDataAsWide,

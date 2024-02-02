@@ -3,20 +3,34 @@ const cors = require('cors');
 const express = require('express');
 const cookieParser = require('cookie-parser');
 const session = require('express-session');
-const VercelKVStore = require('./sessionstores/vercelKvStore');
+const RedisStore = require('connect-redis').default;
+const { redisClient } = require('./redisClient'); // Your Redis client
 
 const app = express();
 app.set('trust proxy', 1); // Trust the first proxy
 app.use(express.json());
 app.use(cookieParser());
 
-app.use(cors(
-  {
-    origin: process.env.WEB_DOMAIN,
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: true,
-  }));
+const corsOptionsDelegate = function (req, callback) {
+  const openRoutes = [
+    'POST /rp/config/:domain'
+  ]; // Add your open routes here
+
+  if (doesRouteMatch(req, openRoutes)) {
+    callback(null, { origin: true }); // Enable CORS for all origins on open routes
+  } else {
+    // Restrictive CORS for other routes
+
+    callback(null, {
+      origin: process.env.WEB_DOMAIN,
+      methods: ['GET', 'POST', 'PUT', 'DELETE'],
+      allowedHeaders: ['Content-Type', 'Authorization'],
+      credentials: true,
+    });
+  }
+};
+
+app.use(cors(corsOptionsDelegate));
 
 let cookieConfig = {
   httpOnly: true,
@@ -33,7 +47,7 @@ console.log('cookieConfig', cookieConfig);
 
 app.use(session({
   secret: process.env.SESSION_SECRET, // Secret used to sign the session ID cookie
-  store: new VercelKVStore(),
+  store: new RedisStore({ client: redisClient }),
   resave: false,
   saveUninitialized: false,
   cookie: cookieConfig
@@ -54,11 +68,16 @@ const options = {
 
 const swaggerSpec = swaggerJsdoc(options);
 const storage = require('./routes/storage');
+const history = require('./routes/history');
 const siweRoutes = require('./routes/siwe');
+const relyingPartyRoutes = require('./routes/relyingParty');
+const doesRouteMatch = require('./helpers/doesRouteMatch');
 
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.use('/storage', storage);
+app.use('/history', history);
 app.use('/siwe', siweRoutes);
+app.use('/rp', relyingPartyRoutes);
 
 const port = process.env.PORT || 3000;
 app.listen(port, () => {
