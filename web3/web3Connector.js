@@ -40,18 +40,28 @@ async function logPayload(payloadKey, payloadSignature) {
 
 async function logPresentation(historyKey, data) {
     const senderAccount = process.env.WEB3_PUBLIC_KEY;
-    
+    const privateKey = process.env.WEB3_PRIVATE_KEY;
+
     const stringifiedData = JSON.stringify(data);
+    const logPresentation = contract.methods.logPresentation(historyKey, stringifiedData);
 
-    const logPresentationTx = contract.methods.logPresentation(historyKey, stringifiedData);
+    const gasEstimate = await web3.eth.estimateGas({
+        from: senderAccount,
+        to: contractAddress,
+        data: logPresentation
+    });
 
-    await logPresentationTx.send({ from: senderAccount })
-        .on('receipt', (receipt) => {
-            console.log('Transaction receipt:', receipt);
-        })
-        .on('error', (error) => {
-            console.error('Error:', error);
-        });
+    const gasPrice = await web3.eth.getGasPrice();
+
+    const signedTransaction = await web3.eth.accounts.signTransaction({
+        from: senderAccount,
+        to: contractAddress,
+        data: logPresentation,
+        gas: gasEstimate,
+        gasPrice: gasPrice
+    }, privateKey);
+
+    const txReceipt = await web3.eth.sendSignedTransaction(signedTransaction.rawTransaction);
 }
 
 async function getPresentationHistory(historyKey) {
