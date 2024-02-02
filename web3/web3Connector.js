@@ -43,7 +43,7 @@ async function logPresentation(historyKey, data) {
     const privateKey = process.env.WEB3_PRIVATE_KEY;
 
     const stringifiedData = JSON.stringify(data);
-    const logPresentation = contract.methods.logPresentation(historyKey, stringifiedData);
+    const logPresentation = contract.methods.logPresentation(historyKey, stringifiedData).encodeABI();
 
     const gasEstimate = await web3.eth.estimateGas({
         from: senderAccount,
