@@ -68,12 +68,14 @@ const options = {
 
 const swaggerSpec = swaggerJsdoc(options);
 const storage = require('./routes/storage');
+const history = require('./routes/history');
 const siweRoutes = require('./routes/siwe');
 const relyingPartyRoutes = require('./routes/relyingParty');
 const doesRouteMatch = require('./helpers/doesRouteMatch');
 
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.use('/storage', storage);
+app.use('/history', history);
 app.use('/siwe', siweRoutes);
 app.use('/rp', relyingPartyRoutes);
 
