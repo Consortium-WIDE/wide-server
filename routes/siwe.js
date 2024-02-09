@@ -6,6 +6,8 @@ const { redisClient } = require('../redisClient');
 
 const ALLOWED_TIME_WINDOW = process.env.SIWE_MESSAGE_EXPIRY_SECONDS * 1000
 
+//TODO: These are sensitive endpoints, so require IP Whitelist
+
 /**
  * @swagger
  * /siwe/generate_signin:
@@ -207,47 +209,16 @@ router.post('/verify_signin', async (req, res) => {
     }
 });
 
-/**
- * @swagger
- * /siwe/tos:
- *   delete:
- *     tags:
- *       - SIWE
- *     summary: Delete Terms of Service (TOS) acknowledgment for a user
- *     description: Deletes the acknowledgment record of the Terms of Service for a specific Ethereum address.
- *     parameters:
- *       - in: query
- *         name: ethereumAddress
- *         required: true
- *         schema:
- *           type: string
- *         description: The Ethereum address of the user whose TOS acknowledgment record is to be deleted.
- *     responses:
- *       200:
- *         description: TOS acknowledgment record successfully deleted.
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 message:
- *                   type: string
- *       400:
- *         description: Bad request, if the Ethereum address is not provided or invalid.
- */
-router.delete('/tos', async (req, res) => {
-    const ethereumAddress = req.query.ethereumAddress;
-    await redisClient.del(`termsofservice:${ethereumAddress}`);
+// router.delete('/tos', async (req, res) => {
+//     const ethereumAddress = req.query.ethereumAddress;
+//     await redisClient.del(`termsofservice:${ethereumAddress}`);
 
-    res.send({ success: true, message: `Delete TOS timestamp for ${ethereumAddress}` });
-});
+//     res.send({ success: true, message: `Delete TOS timestamp for ${ethereumAddress}` });
+// });
 
 router.get('/publicKey', (req, res) => {
     res.send({ success: true, message: process.env.WEB3_PUBLIC_KEY });
 });
-
 
 router.delete('/signout', async (req, res) => {
     const ethereumAddress = req.query.ethereumAddress;
