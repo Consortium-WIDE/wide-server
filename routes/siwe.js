@@ -3,8 +3,11 @@ const cookieParser = require('cookie-parser');
 const router = express.Router();
 const { SiweMessage } = require('siwe');
 const { redisClient } = require('../redisClient');
+const wideMessages = require('../helpers/wideMessages');
 
 const ALLOWED_TIME_WINDOW = process.env.SIWE_MESSAGE_EXPIRY_SECONDS * 1000
+
+//TODO: These are sensitive endpoints, so require IP Whitelist
 
 /**
  * @swagger
@@ -57,7 +60,7 @@ router.get('/generate_signin', async (req, res) => {
         return;
     }
 
-    const message = generateSiweMessage(ethereumAddress, process.env.SIWE_SIGNIN_MESSAGE);
+    const message = generateSiweMessage(ethereumAddress, wideMessages.ethereumSignInMessage);
 
     const nonceValue = JSON.stringify({ nonce: message.nonce, timestamp: new Date() });
 
@@ -101,7 +104,7 @@ router.get('/generate_signin', async (req, res) => {
  */
 router.get('/generate_signup', async (req, res) => {
     const ethereumAddress = req.query.ethereumAddress;
-    const message = generateSiweMessage(ethereumAddress, process.env.SIWE_SIGNUP_MESSAGE);
+    const message = generateSiweMessage(ethereumAddress, wideMessages.ethereumTermsOfServiceMessage);
 
     const nonceValue = JSON.stringify({ nonce: message.nonce, timestamp: new Date() });
     const termsOfServiceValue = JSON.stringify(new Date());
@@ -173,7 +176,7 @@ router.post('/verify_signin', async (req, res) => {
             messageIsValid = checkMessageIntegrity(siweMessage, {
                 domain: process.env.WEB_DOMAIN,
                 address: recoveredAddress,
-                statement: process.env.SIWE_SIGNUP_MESSAGE,
+                statement: wideMessages.ethereumTermsOfServiceMessage,
                 uri: process.env.WEB_DOMAIN,
                 version: '1',
                 chainId: 0
@@ -182,7 +185,7 @@ router.post('/verify_signin', async (req, res) => {
             messageIsValid = checkMessageIntegrity(siweMessage, {
                 domain: process.env.WEB_DOMAIN,
                 address: recoveredAddress,
-                statement: process.env.SIWE_SIGNIN_MESSAGE,
+                statement: wideMessages.ethereumSignInMessage,
                 uri: process.env.WEB_DOMAIN,
                 version: '1',
                 chainId: 0
@@ -207,47 +210,16 @@ router.post('/verify_signin', async (req, res) => {
     }
 });
 
-/**
- * @swagger
- * /siwe/tos:
- *   delete:
- *     tags:
- *       - SIWE
- *     summary: Delete Terms of Service (TOS) acknowledgment for a user
- *     description: Deletes the acknowledgment record of the Terms of Service for a specific Ethereum address.
- *     parameters:
- *       - in: query
- *         name: ethereumAddress
- *         required: true
- *         schema:
- *           type: string
- *         description: The Ethereum address of the user whose TOS acknowledgment record is to be deleted.
- *     responses:
- *       200:
- *         description: TOS acknowledgment record successfully deleted.
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 message:
- *                   type: string
- *       400:
- *         description: Bad request, if the Ethereum address is not provided or invalid.
- */
-router.delete('/tos', async (req, res) => {
-    const ethereumAddress = req.query.ethereumAddress;
-    await redisClient.del(`termsofservice:${ethereumAddress}`);
+// router.delete('/tos', async (req, res) => {
+//     const ethereumAddress = req.query.ethereumAddress;
+//     await redisClient.del(`termsofservice:${ethereumAddress}`);
 
-    res.send({ success: true, message: `Delete TOS timestamp for ${ethereumAddress}` });
-});
+//     res.send({ success: true, message: `Delete TOS timestamp for ${ethereumAddress}` });
+// });
 
 router.get('/publicKey', (req, res) => {
     res.send({ success: true, message: process.env.WEB3_PUBLIC_KEY });
 });
-
 
 router.delete('/signout', async (req, res) => {
     const ethereumAddress = req.query.ethereumAddress;

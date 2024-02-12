@@ -4,6 +4,7 @@ const router = express.Router();
 const { redisClient } = require('../redisClient');
 const isAuthenticated = require('../middleware/authenticate');
 const { logPresentation, getPresentationHistory } = require('../web3/web3Connector');
+const wideMessages = require('../helpers/wideMessages');
 const web3 = require('web3');
 
 router.get('/get', isAuthenticated, async (req, res) => {
@@ -134,7 +135,7 @@ router.post('/logPresentation', isAuthenticated, async (req, res) => {
 });
 
 function getMessage(ethAddress) {
-    return `I, holder of ${ethAddress}, am signing this message for WIDE to store my credential presentation history and understand that I will not share the message signature from this message with anyone other than WIDE.`;
+    return wideMessages.historyKeyMessage.replace('{{ethAddress}}', ethAddress);
 }
 
 module.exports = router;
