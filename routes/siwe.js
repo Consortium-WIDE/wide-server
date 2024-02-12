@@ -3,6 +3,7 @@ const cookieParser = require('cookie-parser');
 const router = express.Router();
 const { SiweMessage } = require('siwe');
 const { redisClient } = require('../redisClient');
+const wideMessages = require('../helpers/wideMessages');
 
 const ALLOWED_TIME_WINDOW = process.env.SIWE_MESSAGE_EXPIRY_SECONDS * 1000
 
@@ -59,7 +60,7 @@ router.get('/generate_signin', async (req, res) => {
         return;
     }
 
-    const message = generateSiweMessage(ethereumAddress, process.env.SIWE_SIGNIN_MESSAGE);
+    const message = generateSiweMessage(ethereumAddress, wideMessages.ethereumSignInMessage);
 
     const nonceValue = JSON.stringify({ nonce: message.nonce, timestamp: new Date() });
 
@@ -103,7 +104,7 @@ router.get('/generate_signin', async (req, res) => {
  */
 router.get('/generate_signup', async (req, res) => {
     const ethereumAddress = req.query.ethereumAddress;
-    const message = generateSiweMessage(ethereumAddress, process.env.SIWE_SIGNUP_MESSAGE);
+    const message = generateSiweMessage(ethereumAddress, wideMessages.ethereumTermsOfServiceMessage);
 
     const nonceValue = JSON.stringify({ nonce: message.nonce, timestamp: new Date() });
     const termsOfServiceValue = JSON.stringify(new Date());
@@ -175,7 +176,7 @@ router.post('/verify_signin', async (req, res) => {
             messageIsValid = checkMessageIntegrity(siweMessage, {
                 domain: process.env.WEB_DOMAIN,
                 address: recoveredAddress,
-                statement: process.env.SIWE_SIGNUP_MESSAGE,
+                statement: wideMessages.ethereumTermsOfServiceMessage,
                 uri: process.env.WEB_DOMAIN,
                 version: '1',
                 chainId: 0
@@ -184,7 +185,7 @@ router.post('/verify_signin', async (req, res) => {
             messageIsValid = checkMessageIntegrity(siweMessage, {
                 domain: process.env.WEB_DOMAIN,
                 address: recoveredAddress,
-                statement: process.env.SIWE_SIGNIN_MESSAGE,
+                statement: wideMessages.ethereumSignInMessage,
                 uri: process.env.WEB_DOMAIN,
                 version: '1',
                 chainId: 0
