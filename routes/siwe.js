@@ -107,10 +107,8 @@ router.get('/generate_signup', async (req, res) => {
     const message = generateSiweMessage(ethereumAddress, wideMessages.ethereumTermsOfServiceMessage);
 
     const nonceValue = JSON.stringify({ nonce: message.nonce, timestamp: new Date() });
-    const termsOfServiceValue = JSON.stringify(new Date());
-
+    
     await redisClient.set(`nonce:${ethereumAddress}`, nonceValue, 'EX', process.env.SIWE_MESSAGE_EXPIRY_SECONDS);
-    await redisClient.set(`termsofservice:${ethereumAddress}`, termsOfServiceValue);
 
     res.send({ message: message });
 });
@@ -159,20 +157,11 @@ router.post('/verify_signin', async (req, res) => {
         const verifiedMsg = await siweMessage.verify({ signature });
         const recoveredAddress = verifiedMsg.data.address;
 
-        //TODO: Verify Terms of Service have been signed
-        const tosSignedKey = `termsofservice:${recoveredAddress}`;
-        const tosSigned = await redisClient.get(tosSignedKey);
-        const tosSignedDate = tosSigned ? new Date(JSON.parse(tosSigned)) : null;
-
-        if (!tosSigned || tosSignedDate > new Date()) {
-            res.send({ success: false, requiresSignup: true, message: 'Terms of Service have not yet been signed.' });
-            return; // Added return to prevent further execution
-        }
-
         let messageIsValid = false;
 
         //Verify Message Integrity
         if (isOnboarding) {
+            
             messageIsValid = checkMessageIntegrity(siweMessage, {
                 domain: process.env.WEB_DOMAIN,
                 address: recoveredAddress,
@@ -181,7 +170,17 @@ router.post('/verify_signin', async (req, res) => {
                 version: '1',
                 chainId: 0
             });
+
         } else {
+            const tosSignedKey = `termsofservice:${recoveredAddress}`;
+            const tosSigned = await redisClient.get(tosSignedKey);
+            const tosSignedDate = tosSigned ? new Date(JSON.parse(tosSigned)) : null;
+    
+            if (!tosSigned || tosSignedDate > new Date()) {
+                res.send({ success: false, requiresSignup: true, message: 'Terms of Service have not yet been signed.' });
+                return; // Added return to prevent further execution
+            }
+
             messageIsValid = checkMessageIntegrity(siweMessage, {
                 domain: process.env.WEB_DOMAIN,
                 address: recoveredAddress,
@@ -200,6 +199,12 @@ router.post('/verify_signin', async (req, res) => {
         if (messageIsValid && nonceInfo && nonceInfo.nonce === siweMessage.nonce && !isNonceExpired(nonceInfo.timestamp)) {
             await redisClient.del(nonceKey);
             req.session.user = recoveredAddress;
+
+            if (isOnboarding) {
+                const termsOfServiceValue = JSON.stringify(new Date());
+                await redisClient.set(`termsofservice:${recoveredAddress}`, termsOfServiceValue);
+            }
+
             res.send({ success: true, message: 'Authentication successful.' });
         } else {
             res.send({ success: false, message: 'Invalid or expired nonce.' });
