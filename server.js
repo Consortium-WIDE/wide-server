@@ -46,6 +46,7 @@ if (process.env.COOKIE_DOMAIN != 'LOCAL') {
 console.log('cookieConfig', cookieConfig);
 
 app.use(session({
+  name: 'wide.sid',
   secret: process.env.SESSION_SECRET, // Secret used to sign the session ID cookie
   store: new RedisStore({ client: redisClient }),
   resave: false,
