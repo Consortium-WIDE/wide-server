@@ -132,7 +132,7 @@ router.post('/user/:accountAddress/credential', isAuthenticated, async (req, res
         const wideIdentifier = hashDataKeccak256(internalIdPayload);
         //We do not need the entire payload. Ephemeral Key and nonce may remain private for increased security
         //The `hashTextKeccak256(payload.ciphertext)` must be sent with all presentations to allow the RP to verify credential presentation to WIDE
-        const encPayloadHash = hashTextKeccak256(payload.ciphertext);
+        const encPayloadHash = hashTextKeccak256(payload);
 
         const issuersIndexKey = `account:${accountAddress}:issued-credentials`;
         const credentialKey = `account:${accountAddress}:credential:${wideIdentifier}`;
@@ -191,7 +191,7 @@ router.put('/user/:accountAddress/credential', isAuthenticated, async (req, res)
         const wideIdentifier = issuer.wideInternalId;
         //We do not need the entire payload. Ephemeral Key and nonce may remain private for increased security
         //The `hashTextKeccak256(payload.ciphertext)` must be sent with all presentations to allow the RP to verify credential presentation to WIDE
-        const encPayloadHash = hashTextKeccak256(payload.ciphertext);
+        const encPayloadHash = hashTextKeccak256(payload);
 
         const credentialKey = `account:${accountAddress}:credential:${wideIdentifier}`;
 
