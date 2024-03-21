@@ -7,6 +7,42 @@ const { logPresentation, getPresentationHistory } = require('../web3/web3Connect
 const wideMessages = require('../helpers/wideMessages');
 const web3 = require('web3');
 
+/**
+ * @swagger
+ * /get:
+ *   get:
+ *     tags:
+ *       - History
+ *     summary: Retrieve presentation history
+ *     description: Retrieves the presentation history for the authenticated user based on their Ethereum address.
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Presentation history retrieved successfully.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       jsonData:
+ *                         type: object
+ *                         description: The JSON data of the presentation.
+ *                       timestamp:
+ *                         type: string
+ *                         format: date-time
+ *                         description: The ISO string representation of the presentation timestamp.
+ *                 hasKey:
+ *                   type: boolean
+ *                   description: Indicates whether the user has a registered history key.
+ *       500:
+ *         description: Internal Server Error
+ */
 router.get('/get', isAuthenticated, async (req, res) => {
     try {
         const ethereumAddress = req.session.user;
@@ -38,6 +74,30 @@ router.get('/get', isAuthenticated, async (req, res) => {
     }
 });
 
+/**
+ * @swagger
+ * /key:
+ *   get:
+ *     tags:
+ *       - History
+ *     summary: Retrieve user's history key
+ *     description: Retrieves the history key for the authenticated user's presentation history.
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: History key retrieved successfully.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 key:
+ *                   type: string
+ *                   description: The user's history key.
+ *       500:
+ *         description: Internal Server Error
+ */
 router.get('/key', isAuthenticated, async (req, res) => {
     try {
         const ethereumAddress = req.session.user;
@@ -53,6 +113,30 @@ router.get('/key', isAuthenticated, async (req, res) => {
     }
 });
 
+/**
+ * @swagger
+ * /hasKey:
+ *   get:
+ *     tags:
+ *       - History
+ *     summary: Check if user has a history key
+ *     description: Checks if the authenticated user has a registered history key for their presentation history.
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: History key existence check result.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 hasKey:
+ *                   type: boolean
+ *                   description: Indicates whether the user has a registered history key.
+ *       500:
+ *         description: Internal Server Error
+ */
 router.get('/hasKey', isAuthenticated, async (req, res) => {
     try {
         const ethereumAddress = req.session.user;
@@ -72,6 +156,30 @@ router.get('/hasKey', isAuthenticated, async (req, res) => {
     }
 });
 
+/**
+ * @swagger
+ * /generate_message:
+ *   get:
+ *     tags:
+ *       - History
+ *     summary: Generate a message for key registration
+ *     description: Generates a message that needs to be signed by the user to register a history key for their presentation history.
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Message generated successfully.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   description: The message to be signed by the user.
+ *       500:
+ *         description: Internal Server Error
+ */
 router.get('/generate_message', isAuthenticated, async (req, res) => {
     try {
         const ethereumAddress = req.session.user;
@@ -84,6 +192,34 @@ router.get('/generate_message', isAuthenticated, async (req, res) => {
     }
 });
 
+/**
+ * @swagger
+ * /register_key:
+ *   post:
+ *     tags:
+ *       - History
+ *     summary: Register a history key
+ *     description: Registers a history key for the authenticated user by verifying a signed message.
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               signature:
+ *                 type: string
+ *                 description: The signature of the message generated by /generate_message endpoint.
+ *     responses:
+ *       200:
+ *         description: History key registered successfully.
+ *       409:
+ *         description: Key has already been registered.
+ *       500:
+ *         description: Unable to recover correct address or Internal Server Error.
+ */
 router.post('/register_key', isAuthenticated, async (req, res) => {
     try {
         const { signature } = req.body;
@@ -116,6 +252,32 @@ router.post('/register_key', isAuthenticated, async (req, res) => {
     }
 });
 
+/**
+ * @swagger
+ * /logPresentation:
+ *   post:
+ *     tags:
+ *       - History
+ *     summary: Log a presentation
+ *     description: Logs a presentation for the authenticated user's history.
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               data:
+ *                 type: object
+ *                 description: The data of the presentation to log.
+ *     responses:
+ *       200:
+ *         description: Presentation logged successfully.
+ *       500:
+ *         description: Internal Server Error
+ */
 router.post('/logPresentation', isAuthenticated, async (req, res) => {
     try {
         const ethereumAddress = req.session.user;
