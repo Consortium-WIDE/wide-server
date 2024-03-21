@@ -7,11 +7,49 @@ const { logPayload, hashDataKeccak256, hashTextKeccak256, recoverDataFromWide, s
 const web3 = require('web3');
 const { generateNonce } = require('siwe');
 
+/**
+ * @swagger
+ * /user/{accountAddress}/issued-credentials:
+ *   get:
+ *     tags:
+ *       - Storage
+ *     summary: Lists all issued credentials for a specific account
+ *     description: Retrieves a list of all credentials issued to the specified account address. Returns an array of credential objects.
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: accountAddress
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The account address to retrieve issued credentials for
+ *     responses:
+ *       200:
+ *         description: An array of issued credential objects
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 additionalProperties: true
+ *       204:
+ *         description: No credentials found for the specified account
+ *       401:
+ *         description: provided accountAddress does not match with the set cookie
+ *       500:
+ *         description: Error retrieving data
+ */
 router.get('/user/:accountAddress/issued-credentials', isAuthenticated, async (req, res) => {
     try {
-        //TODO: verify accountAddress matches cookie.
         const { accountAddress } = req.params;
         const key = `account:${accountAddress}:issued-credentials`;
+
+        if (accountAddress !== req.user) {
+            res.status(401).json('invalid account address');
+            return
+        }
 
         const keyExists = await redisClient.exists(key);
 
@@ -34,11 +72,53 @@ router.get('/user/:accountAddress/issued-credentials', isAuthenticated, async (r
     }
 });
 
+/**
+ * @swagger
+ * /user/{accountAddress}/issued-credential/{wideInternalId}:
+ *   get:
+ *     tags:
+ *       - Storage
+ *     summary: Retrieves a specific issued credential
+ *     description: Retrieves a specific credential issued to the specified account address, identified by its internal ID.
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: accountAddress
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The account address to retrieve the credential for
+ *       - in: path
+ *         name: wideInternalId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The internal ID of the credential to retrieve
+ *     responses:
+ *       200:
+ *         description: The requested credential object
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               additionalProperties: true
+ *       204:
+ *         description: No credential found with the specified ID for the account
+ *       401:
+ *         description: provided accountAddress does not match with the set cookie
+ *       500:
+ *         description: Error retrieving data
+ */
 router.get('/user/:accountAddress/issued-credential/:wideInternalId', isAuthenticated, async (req, res) => {
     try {
-        //TODO: verify accountAddress matches cookie.
         const { accountAddress, wideInternalId } = req.params;
         const key = `account:${accountAddress}:issued-credentials`;
+
+        if (accountAddress !== req.user) {
+            res.status(401).json('invalid account address');
+            return;
+        }
 
         const keyExists = await redisClient.exists(key);
 
@@ -62,11 +142,53 @@ router.get('/user/:accountAddress/issued-credential/:wideInternalId', isAuthenti
     }
 });
 
+/**
+ * @swagger
+ * /user/{accountAddress}/credentials/{key}:
+ *   get:
+ *     tags:
+ *       - Storage
+ *     summary: Retrieves a specific credential by key
+ *     description: Retrieves the details of a specific credential associated with the given account address and key.
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: accountAddress
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The account address to retrieve the credential for
+ *       - in: path
+ *         name: key
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The key of the credential to retrieve
+ *     responses:
+ *       200:
+ *         description: The requested credential data
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               additionalProperties: true
+ *       204:
+ *         description: No credential found for the specified key
+ *       401:
+ *         description: provided accountAddress does not match with the set cookie
+ *       500:
+ *         description: Error retrieving data
+ */
 router.get('/user/:accountAddress/credentials/:key', isAuthenticated, async (req, res) => {
     try {
-        //TODO: verify accountAddress matches cookie.
         const { accountAddress, key } = req.params;
         const credentialKey = `account:${accountAddress}:credential:${key}`;
+
+        if (accountAddress !== req.user) {
+            res.status(401).json('invalid account address');
+            return;
+        }
 
         const credentialData = await redisClient.hgetall(credentialKey);
 
@@ -84,12 +206,47 @@ router.get('/user/:accountAddress/credentials/:key', isAuthenticated, async (req
     }
 });
 
+/**
+ * @swagger
+ * /user/{accountAddress}/credentials/{key}:
+ *   delete:
+ *     tags:
+ *       - Storage
+ *     summary: Deletes a specific credential by key
+ *     description: Deletes a credential identified by the specified key for the given account address. Verifies if the account address from the request matches the authenticated user before proceeding.
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: accountAddress
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The account address associated with the credential to be deleted
+ *       - in: path
+ *         name: key
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The key of the credential to be deleted
+ *     responses:
+ *       200:
+ *         description: Credential deleted successfully or failed to retrieve credential for deletion
+ *       401:
+ *         description: provided accountAddress does not match with the set cookie
+ *       500:
+ *         description: Error deleting credential
+ */
 router.delete('/user/:accountAddress/credentials/:key', isAuthenticated, async (req, res) => {
     try {
-        //TODO: verify accountAddress matches cookie.
         const { accountAddress, key } = req.params;
         const issuersIndexKey = `account:${accountAddress}:issued-credentials`;
         const credentialKey = `account:${accountAddress}:credential:${key}`;
+
+        if (accountAddress !== req.user) {
+            res.status(401).json('invalid account address');
+            return;
+        }
 
         const userCredentials = await redisClient.lrange(issuersIndexKey, 0, -1);
 
@@ -112,13 +269,61 @@ router.delete('/user/:accountAddress/credentials/:key', isAuthenticated, async (
     }
 });
 
+/**
+ * @swagger
+ * /user/{accountAddress}/credential:
+ *   post:
+ *     tags:
+ *       - Storage
+ *     summary: Issues a new credential
+ *     description: Issues a new credential to the specified account address with details provided in the request body. Verifies if the account address from the request matches the authenticated user before proceeding.
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: accountAddress
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The account address to issue a new credential to
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               issuer:
+ *                 type: object
+ *                 description: Dataset representing the issuer and info on the issuance
+ *               payload:
+ *                 type: string
+ *                 description: Entire set of credentials in encrypted format
+ *               credentials:
+ *                 type: string
+ *                 description: Credentials encrypted separately
+ *               rawPayloadHash:
+ *                 type: string
+ *                 description: Hash of the raw payload for additional verification
+ *     responses:
+ *       200:
+ *         description: Credential issued successfully
+ *       401:
+ *         description: provided accountAddress does not match with the set cookie
+ *       500:
+ *         description: Error setting data
+ */
 router.post('/user/:accountAddress/credential', isAuthenticated, async (req, res) => {
     //TODO: Consider separating into two separate try catch blocks to separate redisClient storage from web3 errors.
     try {
-        //TODO: verify accountAddress matches cookie.
         const { accountAddress } = req.params;
         const { issuer, payload, credentials } = req.body;
         const rawPayloadHash = req.body.rawPayloadHash; //possible issue with binding the body?
+
+        if (accountAddress !== req.user) {
+            res.status(401).json('invalid account address');
+            return;
+        }
 
         //Notes:
         //issuer: The dataset representing the Issuer and info on the issuance of the credentials
@@ -170,13 +375,62 @@ router.post('/user/:accountAddress/credential', isAuthenticated, async (req, res
     }
 });
 
+/**
+ * @swagger
+ * /user/{accountAddress}/credential:
+ *   put:
+ *     tags:
+ *       - Storage
+ *     summary: Updates an existing credential
+ *     description: Updates the details of an existing credential for the specified account address with information provided in the request body. Requires the wideInternalId within the issuer object to identify the credential to be updated.
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: accountAddress
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The account address associated with the credential to be updated
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               issuer:
+ *                 type: object
+ *                 required: true
+ *                 description: Dataset representing the issuer, must include wideInternalId for updates
+ *               payload:
+ *                 type: string
+ *                 description: Entire set of credentials in encrypted format
+ *               credentials:
+ *                 type: string
+ *                 description: Credentials encrypted separately
+ *               rawPayloadHash:
+ *                 type: string
+ *                 description: Hash of the raw payload for additional verification
+ *     responses:
+ *       200:
+ *         description: Credential updated successfully
+ *       401:
+ *         description: provided accountAddress does not match with the set cookie
+ *       500:
+ *         description: Error setting data or invalid issuer (wideInternalId missing)
+ */
 router.put('/user/:accountAddress/credential', isAuthenticated, async (req, res) => {
     //TODO: Consider separating into two separate try catch blocks to separate redisClient storage from web3 errors.
     try {
-        //TODO: verify accountAddress matches cookie.
         const { accountAddress } = req.params;
         const { issuer, payload, credentials } = req.body;
         const rawPayloadHash = req.body.rawPayloadHash; //possible issue with binding the body?
+
+        if (accountAddress !== req.user) {
+            res.status(401).json('invalid account address');
+            return;
+        }
 
         //Notes:
         //issuer: The dataset representing the Issuer and info on the issuance of the credentials

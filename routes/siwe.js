@@ -7,7 +7,7 @@ const wideMessages = require('../helpers/wideMessages');
 
 const ALLOWED_TIME_WINDOW = process.env.SIWE_MESSAGE_EXPIRY_SECONDS * 1000
 
-//TODO: These are sensitive endpoints, so require IP Whitelist
+//TODO: These are sensitive endpoints, so consider requiring IP Whitelist on top of CORS?
 
 /**
  * @swagger
