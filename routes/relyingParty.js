@@ -85,9 +85,17 @@ router.post('/config/:domain', async (req, res) => {
         const key = `rp:${domain}:config`;
         const data = req.body;
 
-        await redisClient.set(key, JSON.stringify(data));
+        const keyExists = await redisClient.exists(key);
 
-        res.status(200).json(`Config for ${domain} registered successfully`);
+        if (keyExists) {
+            //We do this to prevent unauthorized 3rd parties to re-use the key to replace the config.
+            //This is a very dirty solution in place until we implement api keys
+            res.status(208).json(`Config for ${domain} has already been registered. It cannot be updated.`);
+        } else {
+            await redisClient.set(key, JSON.stringify(data));
+            res.status(200).json(`Config for ${domain} registered successfully`);
+        }
+
     } catch (error) {
         console.error('Error setting data:', error);
         res.status(500).json('Error setting data');
